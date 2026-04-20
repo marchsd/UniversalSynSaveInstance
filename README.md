@@ -7,7 +7,7 @@
 
 ```lua
 local Params = {
- RepoURL = "https://github.com/marchsd/UniversalSynSaveInstance/main/",
+ RepoURL = "https://raw.githubusercontent.com/marchsd/UniversalSynSaveInstance",
  SSI = "saveinstance",
 }
 local synsaveinstance = loadstring(game:HttpGet(Params.RepoURL .. Params.SSI .. ".luau", true), Params.SSI)()
