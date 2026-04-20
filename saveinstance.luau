@@ -2289,7 +2289,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 
 	local totalsize, chunks = 0, table.create(1)
 	local savebuffer, savebuffer_size = {}, 1
-	local header = ""
+	local header = " "
 
 	local StatusText
 
@@ -3602,7 +3602,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 													and instance:IsA("Script")
 													and instance.RunContext ~= Enum.RunContext.Client
 											then
-												value = "-- [FilteringEnabled] Server Scripts are IMPOSSIBLE to save" -- TODO: Could be not just server scripts in the future
+												value = " " -- TODO: Could be not just server scripts in the future
 											else
 												value = ldecompile(instance)
 												if SaveBytecode then
@@ -3614,7 +3614,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 											end
 										end
 
-										value = ""
+										value = " "
 											.. (hasLinkedSource and "-- Original Source: https://assetdelivery.roblox.com/v1/asset/?" .. (LinkedSource_type or "id") .. "=" .. (LinkedSource or LinkedSource_Url) .. "\n\n" or "")
 											.. value
 									end
@@ -3850,7 +3850,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 			end
 		end
 
-		savebuffer[savebuffer_size] = ""
+		savebuffer[savebuffer_size] = " "
 		savebuffer_size += 1
 		save_cache()
 		do

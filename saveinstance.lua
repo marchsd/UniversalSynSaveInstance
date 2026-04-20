@@ -2217,7 +2217,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 
 	local currentstr, currentsize, totalsize, chunks = "", 0, 0, table.create(1)
 	local savebuffer, savebuffer_size = {}, 1
-	local header = ""
+	local header = " "
 	local StatusText
 
 	local OPTIONS = {
@@ -3470,8 +3470,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 															and instance:IsA("Script")
 															and instance.RunContext ~= Enum.RunContext.Client
 													then
-														value =
-															"-- [FilteringEnabled] Server Scripts are IMPOSSIBLE to save" -- TODO: Could be not just server scripts in the future
+														value = " "
 													else
 														value = ldecompile(instance)
 														if SaveBytecode then
@@ -3483,7 +3482,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 													end
 												end
 
-												value = ""
+												value = " "
 													.. (hasLinkedSource and "-- Original Source: https://assetdelivery.roblox.com/v1/asset/?" .. (LinkedSource_type or "id") .. "=" .. (LinkedSource or LinkedSource_Url) .. "\n\n" or "")
 													.. value
 											end
@@ -3678,33 +3677,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 		end
 
 		if OPTIONS.ReadMe then
-			save_extra(
-				"README",
-				nil,
-				nil,
-				"Script",
-				"--[[\n"
-					.. (#RecoveredScripts ~= 0 and "\t\tIMPORTANT: Original Source of these Scripts was Recovered: " .. service.HttpService:JSONEncode(
-						RecoveredScripts
-					) .. "\n" or "")
-					.. [[
-
-		            ]]
-					.. service.HttpService:JSONEncode(OPTIONS)
-					.. "\n\n\t\tElapsed time: "
-					.. os.clock() - elapse_t
-					.. " Date (UTC): "
-					.. DateTime.now():FormatUniversalTime("LL LTS", "en-gb")
-					.. " PlaceId: "
-					.. game.PlaceId
-					.. " PlaceVersion: "
-					.. game.PlaceVersion
-					.. " Client Version: "
-					.. FULL_VERSION
-					.. " Executor: "
-					.. (identify_executor and table.concat({ identify_executor() }, " ") or "Unknown")
-					.. "\n]]"
-			)
+			print("!")
 		end
 		do
 			local tmp = { "<SharedStrings>" }
@@ -3720,7 +3693,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 			end
 		end
 
-		savebuffer[savebuffer_size] = ""
+		savebuffer[savebuffer_size] = " "
 		savebuffer_size = savebuffer_size + 1
 		save_cache(true)
 		do
