@@ -1,7 +1,6 @@
 --!native
 --!optimize 2
 --!divine-intellect
--- https://discord.gg/wx4ThpAsmw
 
 local function string_find(s, pattern, init)
 	return string.find(s, pattern, init, true)
@@ -35,32 +34,43 @@ local global_container
 do
 	local filename = "UniversalMethodFinder"
 
-	local finder
-	finder, global_container = loadstring(
-		game:HttpGet("https://raw.githubusercontent.com/luau/SomeHub/main/" .. filename .. ".luau", true),
-		filename
-	)()
+	global_container = {}
+	local bootstrapOk, finder = pcall(function()
+		local source = game:HttpGet("https://raw.githubusercontent.com/marchsd/SomeHub/main/" .. filename .. ".luau", true)
+		local chunk = loadstring(source, filename)
+		if not chunk then
+			error("UniversalMethodFinder loadstring failed")
+		end
+		local discoveredFinder, discoveredContainer = chunk()
+		global_container = discoveredContainer or {}
+		return discoveredFinder
+	end)
 
-	finder({
-		-- readbinarystring = 'string.find(...,"bin",nil,true)', -- ! Could match some unwanted stuff (getbinaryindex)
-		-- request = 'string.find(...,"request",nil,true) and not string.find(...,"internal",nil,true)',
-		base64encode = 'local a={...}local b=a[1]local function c(a,b)return string.find(a,b,nil,true)end;return c(b,"encode")and(c(b,"base64")or c(string.lower(tostring(a[2])),"base64"))',
-		-- cloneref = 'string.find(...,"clone",nil,true) and string.find(...,"ref",nil,true)',
-		-- decompile = '(string.find(...,"decomp",nil,true) and string.sub(...,#...) ~= "s")',
-		gethiddenproperty = 'string.find(...,"get",nil,true) and string.find(...,"h",nil,true) and string.find(...,"prop",nil,true) and string.sub(...,#...) ~= "s"',
-		gethui = 'string.find(...,"get",nil,true) and string.find(...,"h",nil,true) and string.find(...,"ui",nil,true)',
-		-- getcon = 'string.find(...,"get",nil,true) and (string.find(...,"conn",nil,true) or string.find(...,"sig",nil,true)) and string.sub(...,#(...))=="s"',
-		getnilinstances = 'string.find(...,"nil",nil,true) and string.find(...,"get",nil,true) and string.sub(...,#...) == "s"', -- ! Could match some unwanted stuff
-		getscriptbytecode = 'string.find(...,"get",nil,true) and string.find(...,"script",nil,true) and string.find(...,"bytecode",nil,true)', --  or string.find(...,"dump",nil,true) and string.find(...,"string",nil,true) due to Fluxus (dumpstring returns a function)
-		-- hash = 'local a={...}local b=a[1]local function c(a,b)return string.find(a,b,nil,true)end;return c(b,"hash")and c(string.lower(tostring(a[2])),"crypt")',
-		protectgui = 'string.find(...,"protect",nil,true) and string.find(...,"ui",nil,true) and not string.find(...,"un",nil,true)',
-		-- setthreadidentity = 'string.find(...,"identity",nil,true) and string.find(...,"set",nil,true)',
-	}, true, 10)
+	if bootstrapOk and finder then
+		pcall(finder, {
+			-- readbinarystring = 'string.find(...,"bin",nil,true)', -- ! Could match some unwanted stuff (getbinaryindex)
+			-- request = 'string.find(...,"request",nil,true) and not string.find(...,"internal",nil,true)',
+			base64encode = 'local a={...}local b=a[1]local function c(a,b)return string.find(a,b,nil,true)end;return c(b,"encode")and(c(b,"base64")or c(string.lower(tostring(a[2])),"base64"))',
+			-- cloneref = 'string.find(...,"clone",nil,true) and string.find(...,"ref",nil,true)',
+			-- decompile = '(string.find(...,"decomp",nil,true) and string.sub(...,#...) ~= "s")',
+			gethiddenproperty = 'string.find(...,"get",nil,true) and string.find(...,"h",nil,true) and string.find(...,"prop",nil,true) and string.sub(...,#...) ~= "s"',
+			gethui = 'string.find(...,"get",nil,true) and string.find(...,"h",nil,true) and string.find(...,"ui",nil,true)',
+			-- getcon = 'string.find(...,"get",nil,true) and (string.find(...,"conn",nil,true) or string.find(...,"sig",nil,true)) and string.sub(...,#(...))=="s"',
+			getnilinstances = 'string.find(...,"nil",nil,true) and string.find(...,"get",nil,true) and string.sub(...,#...) == "s"', -- ! Could match some unwanted stuff
+			getscriptbytecode = 'string.find(...,"get",nil,true) and string.find(...,"script",nil,true) and string.find(...,"bytecode",nil,true)', --  or string.find(...,"dump",nil,true) and string.find(...,"string",nil,true) due to Fluxus (dumpstring returns a function)
+			-- hash = 'local a={...}local b=a[1]local function c(a,b)return string.find(a,b,nil,true)end;return c(b,"hash")and c(string.lower(tostring(a[2])),"crypt")',
+			protectgui = 'string.find(...,"protect",nil,true) and string.find(...,"ui",nil,true) and not string.find(...,"un",nil,true)',
+			-- setthreadidentity = 'string.find(...,"identity",nil,true) and string.find(...,"set",nil,true)',
+		}, true, 10)
+	else
+		warn("[USSI] UniversalMethodFinder bootstrap failed; continuing with reduced feature set")
+	end
 end
 
 local identify_executor = identifyexecutor or getexecutorname or whatexecutor
 
 local EXECUTOR_NAME = identify_executor and identify_executor() or ""
+local native_base64encode = base64encode
 
 -- local cloneref = global_container.cloneref
 local gethiddenproperty = global_container.gethiddenproperty
@@ -72,15 +82,38 @@ local readfile = readfile
 local writefile = writefile
 
 local getscriptbytecode = global_container.getscriptbytecode -- * A lot of assumptions are made based on whether this function is defined or not. So in certain edge cases, like if the executor defines "decompile" or "getscripthash" function yet doesn't define this function there might be loss of functionality of the saveinstance. Although that would be very rare and weird
-local base64encode = global_container.base64encode
+local base64encode = global_container.base64encode or native_base64encode or function(value)
+	return tostring(value)
+end
 
 local service = setmetatable({}, {
 	__index = function(self, serviceName)
 		local o, s = pcall(Instance.new, serviceName)
 		local Service = o and s
-			or game:GetService(serviceName)
-			or settings():GetService(serviceName)
-			or UserSettings():GetService(serviceName)
+
+		if not Service then
+			pcall(function()
+				Service = game:GetService(serviceName)
+			end)
+		end
+
+		if not Service then
+			pcall(function()
+				local settingsObject = settings()
+				if settingsObject then
+					Service = settingsObject:GetService(serviceName)
+				end
+			end)
+		end
+
+		if not Service then
+			pcall(function()
+				local userSettingsObject = UserSettings()
+				if userSettingsObject then
+					Service = userSettingsObject:GetService(serviceName)
+				end
+			end)
+		end
 
 		-- if cloneref then
 		-- 	Service = cloneref(Service)
@@ -1218,8 +1251,8 @@ do
 
 	local NotScriptableFixes = { --[[
 		For more info:
-		- https://github.com/luau/UniversalSynSaveInstance/blob/main/Tools/NotScriptable-Related/Potentially%20Missing%20Properties%20Dumper/Potentially%20Missing%20Properties%20Dumper.luau
-		- https://github.com/luau/UniversalSynSaveInstance/blob/main/Tools/NotScriptable-Related/NotScriptable%20Dumper/NotScriptable%20Dumper.py
+		- https://github.com/marchsd/UniversalSynSaveInstance/blob/main/Tools/NotScriptable-Related/Potentially%20Missing%20Properties%20Dumper/Potentially%20Missing%20Properties%20Dumper.luau
+		- https://github.com/marchsd/UniversalSynSaveInstance/blob/main/Tools/NotScriptable-Related/NotScriptable%20Dumper/NotScriptable%20Dumper.py
 		]]
 		Instance = {
 			AttributesSerialize = function(instance)
@@ -2259,7 +2292,7 @@ local GLOBAL_ENV = getgenv and getgenv() or _G or shared
 	Saves instances with specified options. Example:
 	```lua
 	local Params = {
-		RepoURL = "https://raw.githubusercontent.com/luau/UniversalSynSaveInstance/main/",
+		RepoURL = "https://raw.githubusercontent.com/marchsd/UniversalSynSaveInstance/main/",
 		SSI = "saveinstance",
 	}
 
@@ -2290,7 +2323,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 	local totalsize, chunks = 0, table.create(1)
 	local savebuffer, savebuffer_size = {}, 1
 	local header =
-		'<!-- Saved by UniversalSynSaveInstance (Join to Copy Games) https://discord.gg/wx4ThpAsmw --><roblox version="4">'
+		'<roblox version="4">'
 
 	local StatusText
 
@@ -2507,6 +2540,11 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 				CustomOptions = {}
 			else
 				for key, value in CustomOptions do
+					local keyType = type(key)
+					if keyType ~= "string" then
+						continue
+					end
+
 					local k = string.lower(key)
 
 					local option = OPTIONS_lowercase[k]
@@ -3615,8 +3653,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 											end
 										end
 
-										value = "-- Saved by UniversalSynSaveInstance (Join to Copy Games) https://discord.gg/wx4ThpAsmw\n\n"
-											.. (hasLinkedSource and "-- Original Source: https://assetdelivery.roblox.com/v1/asset/?" .. (LinkedSource_type or "id") .. "=" .. (LinkedSource or LinkedSource_Url) .. "\n\n" or "")
+										value = (hasLinkedSource and "-- Original Source: https://assetdelivery.roblox.com/v1/asset/?" .. (LinkedSource_type or "id") .. "=" .. (LinkedSource or LinkedSource_Url) .. "\n\n" or "")
 											.. value
 									end
 								end
@@ -3884,7 +3921,7 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 		end
 
 		savebuffer[savebuffer_size] =
-			"</roblox><!-- Saved by UniversalSynSaveInstance (Join to Copy Games) https://discord.gg/wx4ThpAsmw -->"
+			"</roblox>"
 		savebuffer_size += 1
 		save_cache()
 		do
@@ -3899,7 +3936,10 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 
 			local Callback = OPTIONS.Callback
 			if Callback then
-				Callback(buildFinalString(chunks), chunks)
+				local ok_callback, callback_error = pcall(Callback, buildFinalString(chunks), chunks)
+				if not ok_callback then
+					warn("saveinstance callback error:", callback_error)
+				end
 			elseif OPTIONS.AlternativeWritefile and appendfile then
 				local SEGMENT_SIZE = 4145728 -- Celery has an arbitrary savefile/appendfile size limit of ~4MB for reasons unknown. This is a workaround to save the file in segments.
 				local totallen = 0
@@ -4087,21 +4127,38 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 			return table.concat(randomarray)
 		end
 
+		local attached = false
 		if global_container.gethui then
-			StatusGui.Name = randomString()
-			StatusGui.Parent = global_container.gethui()
-		else
-			if global_container.protectgui then
+			local ok_hui, hui = pcall(global_container.gethui)
+			if ok_hui and hui then
 				StatusGui.Name = randomString()
-				global_container.protectgui(StatusGui)
-				StatusGui.Parent = game:GetService("CoreGui")
-			else
-				local RobloxGui = game:GetService("CoreGui"):FindFirstChild("RobloxGui")
+				StatusGui.Parent = hui
+				attached = true
+			end
+		end
+
+		if not attached then
+			local CoreGui
+			pcall(function()
+				CoreGui = game:GetService("CoreGui")
+			end)
+
+			if CoreGui then
+				if global_container.protectgui then
+					pcall(function()
+						StatusGui.Name = randomString()
+						global_container.protectgui(StatusGui)
+					end)
+				end
+
+				local RobloxGui = CoreGui:FindFirstChild("RobloxGui")
 				if RobloxGui then
 					StatusGui.Parent = RobloxGui
 				else
-					StatusGui.Name = randomString()
-					StatusGui.Parent = game:GetService("CoreGui")
+					if not StatusGui.Name or StatusGui.Name == "" then
+						StatusGui.Name = randomString()
+					end
+					StatusGui.Parent = CoreGui
 				end
 			end
 		end
@@ -4348,5 +4405,202 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 		end
 	end
 end
+
+local function OpenSynSaveInstanceGUI()
+	local parentGui
+	pcall(function()
+		local CoreGui = game:GetService("CoreGui")
+		local RobloxGui = CoreGui and CoreGui:FindFirstChild("RobloxGui")
+		parentGui = RobloxGui or CoreGui
+	end)
+
+	if not parentGui then
+		pcall(function()
+			local Players = game:GetService("Players")
+			local localPlayer = Players.LocalPlayer
+			if localPlayer then
+				parentGui = localPlayer:FindFirstChildOfClass("PlayerGui")
+			end
+		end)
+	end
+
+	if not parentGui then
+		warn("[USSI] GUI parent not available")
+		return
+	end
+
+	local oldGui = parentGui:FindFirstChild("USSI_ConfigGUI")
+	if oldGui then
+		oldGui:Destroy()
+	end
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "USSI_ConfigGUI"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 2e9 - 1
+	gui.Parent = parentGui
+
+	local frame = Instance.new("Frame")
+	frame.Name = "Panel"
+	frame.Size = UDim2.fromOffset(360, 460)
+	frame.Position = UDim2.fromScale(0.5, 0.5)
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+	frame.BorderSizePixel = 0
+	frame.Parent = gui
+
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.new(1, -12, 0, 28)
+	title.Position = UDim2.fromOffset(8, 8)
+	title.Font = Enum.Font.Code
+	title.TextColor3 = Color3.new(1, 1, 1)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.TextSize = 18
+	title.Text = "Universal Syn Save Instance - Quick Config"
+	title.Parent = frame
+
+	local y = 46
+	local controls = {}
+
+	local function addToggle(key, defaultValue)
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(1, -16, 0, 28)
+		button.Position = UDim2.fromOffset(8, y)
+		button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.BorderSizePixel = 0
+		button.Font = Enum.Font.Code
+		button.TextSize = 15
+		button.AutoButtonColor = true
+		button.Parent = frame
+
+		local state = defaultValue and true or false
+		local function refresh()
+			button.Text = key .. ": " .. (state and "ON" or "OFF")
+		end
+		refresh()
+
+		button.Activated:Connect(function()
+			state = not state
+			refresh()
+		end)
+
+		controls[key] = function()
+			return state
+		end
+		y += 32
+	end
+
+	local modeButton = Instance.new("TextButton")
+	modeButton.Size = UDim2.new(1, -16, 0, 28)
+	modeButton.Position = UDim2.fromOffset(8, y)
+	modeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	modeButton.TextColor3 = Color3.new(1, 1, 1)
+	modeButton.BorderSizePixel = 0
+	modeButton.Font = Enum.Font.Code
+	modeButton.TextSize = 15
+	modeButton.Parent = frame
+
+	local modes = { "optimized", "full", "scripts" }
+	local modeIndex = 1
+	local function refreshMode()
+		modeButton.Text = "mode: " .. modes[modeIndex]
+	end
+	refreshMode()
+	modeButton.Activated:Connect(function()
+		modeIndex = modeIndex % #modes + 1
+		refreshMode()
+	end)
+	y += 32
+
+	local timeoutLabel = Instance.new("TextLabel")
+	timeoutLabel.BackgroundTransparency = 1
+	timeoutLabel.Size = UDim2.new(1, -16, 0, 20)
+	timeoutLabel.Position = UDim2.fromOffset(8, y)
+	timeoutLabel.Font = Enum.Font.Code
+	timeoutLabel.TextColor3 = Color3.new(1, 1, 1)
+	timeoutLabel.TextXAlignment = Enum.TextXAlignment.Left
+	timeoutLabel.TextSize = 14
+	timeoutLabel.Text = "DecompileTimeout (seconds)"
+	timeoutLabel.Parent = frame
+	y += 20
+
+	local timeoutBox = Instance.new("TextBox")
+	timeoutBox.Size = UDim2.new(1, -16, 0, 28)
+	timeoutBox.Position = UDim2.fromOffset(8, y)
+	timeoutBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	timeoutBox.TextColor3 = Color3.new(1, 1, 1)
+	timeoutBox.BorderSizePixel = 0
+	timeoutBox.Font = Enum.Font.Code
+	timeoutBox.TextSize = 15
+	timeoutBox.ClearTextOnFocus = false
+	timeoutBox.Text = "10"
+	timeoutBox.Parent = frame
+	y += 36
+
+	addToggle("Decompile", true)
+	addToggle("SaveBytecode", false)
+	addToggle("IgnoreDefaultProperties", true)
+	addToggle("IgnoreNotArchivable", true)
+	addToggle("SaveNotCreatable", false)
+	addToggle("IsolatePlayers", false)
+	addToggle("IsolateLocalPlayer", false)
+	addToggle("SavePlayerCharacters", false)
+	addToggle("ShowStatus", true)
+	addToggle("SafeMode", true)
+
+	local runButton = Instance.new("TextButton")
+	runButton.Size = UDim2.new(0.5, -12, 0, 32)
+	runButton.Position = UDim2.new(0, 8, 1, -40)
+	runButton.BackgroundColor3 = Color3.fromRGB(38, 82, 54)
+	runButton.TextColor3 = Color3.new(1, 1, 1)
+	runButton.BorderSizePixel = 0
+	runButton.Font = Enum.Font.Code
+	runButton.TextSize = 15
+	runButton.Text = "Run Save"
+	runButton.Parent = frame
+
+	local closeButton = Instance.new("TextButton")
+	closeButton.Size = UDim2.new(0.5, -12, 0, 32)
+	closeButton.Position = UDim2.new(0.5, 4, 1, -40)
+	closeButton.BackgroundColor3 = Color3.fromRGB(95, 39, 39)
+	closeButton.TextColor3 = Color3.new(1, 1, 1)
+	closeButton.BorderSizePixel = 0
+	closeButton.Font = Enum.Font.Code
+	closeButton.TextSize = 15
+	closeButton.Text = "Close"
+	closeButton.Parent = frame
+
+	closeButton.Activated:Connect(function()
+		gui:Destroy()
+	end)
+
+	runButton.Activated:Connect(function()
+		local timeout = tonumber(timeoutBox.Text) or 10
+		local options = {
+			mode = modes[modeIndex],
+			DecompileTimeout = math.max(0, timeout),
+		}
+
+		for key, getter in controls do
+			options[key] = getter()
+		end
+
+		task.spawn(function()
+			local ok, err = pcall(synsaveinstance, options)
+			if not ok then
+				warn("[USSI] Run from GUI failed:", err)
+			end
+		end)
+	end)
+
+	return gui
+end
+
+GLOBAL_ENV.OpenSynSaveInstanceGUI = OpenSynSaveInstanceGUI
+task.defer(function()
+	pcall(OpenSynSaveInstanceGUI)
+end)
 
 return synsaveinstance

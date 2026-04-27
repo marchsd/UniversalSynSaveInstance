@@ -7,7 +7,7 @@
 
 ```lua
 local Params = {
- RepoURL = "https://raw.githubusercontent.com/luau/UniversalSynSaveInstance/main/",
+ RepoURL = "https://raw.githubusercontent.com/marchsd/UniversalSynSaveInstance/main/",
  SSI = "saveinstance",
 }
 local synsaveinstance = loadstring(game:HttpGet(Params.RepoURL .. Params.SSI .. ".luau", true), Params.SSI)()
@@ -24,7 +24,7 @@ Reason: Many tools fail miserably at providing good user experience when it come
 > As stated under the Section 7 (b) in the LICENSE:
 > - You **MUST** always include the following Credit string: `UniversalSynSaveInstance https://discord.gg/wx4ThpAsmw`
 > - You are **NOT** allowed to claim authorship of the source code provided in this repository
-> - You **MUST** always include the following [License](https://github.com/luau/UniversalSynSaveInstance/blob/main/LICENSE)
+> - You **MUST** always include the following [License](https://github.com/marchsd/UniversalSynSaveInstance/blob/main/LICENSE)
 
 ## Disclaimer
 
