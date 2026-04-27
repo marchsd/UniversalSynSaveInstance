@@ -2309,7 +2309,7 @@ local GLOBAL_ENV = getgenv and getgenv() or _G or shared
 	@param Parameter_2 table -- [OPTIONAL] If present, then Parameter_2 will be assumed to be [SynSaveInstance.CustomOptions table]. And then if the Parameter_1 is an Instance, then it will be assumed to be [SynSaveInstance.CustomOptions table].Object. If Parameter_1 is a table filled with instances ({Instance}), then it will be assumed to be [SynSaveInstance.CustomOptions table].ExtraInstances and IsModel will be true). This exists for sake compatibility with `saveinstance(game, {})`
 ]=]
 
-local function synsaveinstance(CustomOptions, CustomOptions2)
+local function runSaveInstance(CustomOptions, CustomOptions2)
 	if GLOBAL_ENV.USSI then
 		return
 	end
@@ -4376,7 +4376,56 @@ local function synsaveinstance(CustomOptions, CustomOptions2)
 	end
 end
 
-local function OpenSynSaveInstanceGUI()
+local function cloneOptionsTable(t)
+	local o = {}
+	if t and type(t) == "table" then
+		for k, v in t do
+			o[k] = v
+		end
+	end
+	return o
+end
+
+local function getSeedOptionsTableForGui(arg1, arg2)
+	if arg2 and type(arg2) == "table" then
+		return arg2
+	end
+	if type(arg1) == "table" and typeof(arg1[1]) ~= "Instance" then
+		return arg1
+	end
+	return {}
+end
+
+local function seedLookup(seedTbl, key, alternateKeys)
+	if not seedTbl then
+		return nil
+	end
+	local v = seedTbl[key]
+	if v ~= nil then
+		return v
+	end
+	if alternateKeys then
+		for _, alt in alternateKeys do
+			local w = seedTbl[alt]
+			if w ~= nil then
+				return w
+			end
+		end
+	end
+	return nil
+end
+
+local function pickToggleState(seedTbl, key, alternates, defaultBool)
+	local v = seedLookup(seedTbl, key, alternates)
+	if v == nil then
+		return defaultBool and true or false
+	end
+	return v and true or false
+end
+
+local function OpenSynSaveInstanceGUI(seedArg1, seedArg2)
+	local seedForGui = getSeedOptionsTableForGui(seedArg1, seedArg2)
+
 	local parentGui
 	pcall(function()
 		local CoreGui = game:GetService("CoreGui")
@@ -4433,7 +4482,7 @@ local function OpenSynSaveInstanceGUI()
 	local y = 46
 	local controls = {}
 
-	local function addToggle(key, defaultValue)
+	local function addToggle(key, defaultValue, alternates)
 		local button = Instance.new("TextButton")
 		button.Size = UDim2.new(1, -16, 0, 28)
 		button.Position = UDim2.fromOffset(8, y)
@@ -4445,7 +4494,7 @@ local function OpenSynSaveInstanceGUI()
 		button.AutoButtonColor = true
 		button.Parent = frame
 
-		local state = defaultValue and true or false
+		local state = pickToggleState(seedForGui, key, alternates, defaultValue)
 		local function refresh()
 			button.Text = key .. ": " .. (state and "ON" or "OFF")
 		end
@@ -4474,6 +4523,16 @@ local function OpenSynSaveInstanceGUI()
 
 	local modes = { "optimized", "full", "scripts" }
 	local modeIndex = 1
+	local seededMode = seedLookup(seedForGui, "mode", nil)
+	if type(seededMode) == "string" then
+		local lower = string.lower(seededMode)
+		for i = 1, #modes do
+			if string.lower(modes[i]) == lower then
+				modeIndex = i
+				break
+			end
+		end
+	end
 	local function refreshMode()
 		modeButton.Text = "mode: " .. modes[modeIndex]
 	end
@@ -4505,20 +4564,25 @@ local function OpenSynSaveInstanceGUI()
 	timeoutBox.Font = Enum.Font.Code
 	timeoutBox.TextSize = 15
 	timeoutBox.ClearTextOnFocus = false
-	timeoutBox.Text = "10"
+	local seedTimeout = seedLookup(seedForGui, "DecompileTimeout", { "timeout" })
+	if type(seedTimeout) == "number" then
+		timeoutBox.Text = tostring(seedTimeout)
+	else
+		timeoutBox.Text = "10"
+	end
 	timeoutBox.Parent = frame
 	y += 36
 
-	addToggle("Decompile", true)
-	addToggle("SaveBytecode", false)
-	addToggle("IgnoreDefaultProperties", true)
-	addToggle("IgnoreNotArchivable", true)
-	addToggle("SaveNotCreatable", false)
-	addToggle("IsolatePlayers", false)
-	addToggle("IsolateLocalPlayer", false)
-	addToggle("SavePlayerCharacters", false)
-	addToggle("ShowStatus", true)
-	addToggle("SafeMode", true)
+	addToggle("Decompile", true, nil)
+	addToggle("SaveBytecode", false, nil)
+	addToggle("IgnoreDefaultProperties", true, { "IgnoreDefaultProps" })
+	addToggle("IgnoreNotArchivable", true, { "IgnoreArchivable" })
+	addToggle("SaveNotCreatable", false, nil)
+	addToggle("IsolatePlayers", false, nil)
+	addToggle("IsolateLocalPlayer", false, { "SaveLocalPlayer", "IsolatePlayerGui", "SavePlayerGui" })
+	addToggle("SavePlayerCharacters", false, nil)
+	addToggle("ShowStatus", true, nil)
+	addToggle("SafeMode", true, nil)
 
 	local runButton = Instance.new("TextButton")
 	runButton.Size = UDim2.new(0.5, -12, 0, 32)
@@ -4528,7 +4592,7 @@ local function OpenSynSaveInstanceGUI()
 	runButton.BorderSizePixel = 0
 	runButton.Font = Enum.Font.Code
 	runButton.TextSize = 15
-	runButton.Text = "Run Save"
+	runButton.Text = "Decompile"
 	runButton.Parent = frame
 
 	local closeButton = Instance.new("TextButton")
@@ -4546,31 +4610,75 @@ local function OpenSynSaveInstanceGUI()
 		gui:Destroy()
 	end)
 
+	local runBusy = false
 	runButton.Activated:Connect(function()
+		if runBusy then
+			return
+		end
+
 		local timeout = tonumber(timeoutBox.Text) or 10
-		local options = {
+		local guiOpts = {
 			mode = modes[modeIndex],
 			DecompileTimeout = math.max(0, timeout),
 		}
 
 		for key, getter in controls do
-			options[key] = getter()
+			guiOpts[key] = getter()
 		end
 
+		local function mergeGuiInto(dst)
+			for k, v in guiOpts do
+				dst[k] = v
+			end
+		end
+
+		runBusy = true
 		task.spawn(function()
-			local ok, err = pcall(synsaveinstance, options)
+			runButton.AutoButtonColor = false
+			runButton.Active = false
+			runButton.Text = "Decompiling..."
+			local prevBg = runButton.BackgroundColor3
+			runButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+
+			local s1, s2 = seedArg1, seedArg2
+			local merged = cloneOptionsTable(seedForGui)
+			mergeGuiInto(merged)
+
+			local ok, err = pcall(function()
+				if s2 and type(s2) == "table" and typeof(s1) == "Instance" then
+					runSaveInstance(s1, merged)
+				elseif s2 and type(s2) == "table" and type(s1) == "table" and typeof(s1[1]) == "Instance" then
+					runSaveInstance(s1, merged)
+				elseif type(s1) == "table" and typeof(s1[1]) == "Instance" and not (s2 and type(s2) == "table") then
+					runSaveInstance(s1, merged)
+				elseif typeof(s1) == "Instance" and not (s2 and type(s2) == "table") then
+					runSaveInstance(s1, merged)
+				else
+					runSaveInstance(merged, nil)
+				end
+			end)
+
 			if not ok then
 				warn("[USSI] Run from GUI failed:", err)
 			end
+
+			if runButton.Parent then
+				runButton.Text = "Decompile"
+				runButton.BackgroundColor3 = prevBg
+				runButton.Active = true
+				runButton.AutoButtonColor = true
+			end
+			runBusy = false
 		end)
 	end)
 
 	return gui
 end
 
+local function synsaveinstance(opts, opts2)
+	return OpenSynSaveInstanceGUI(opts, opts2)
+end
+
 GLOBAL_ENV.OpenSynSaveInstanceGUI = OpenSynSaveInstanceGUI
-task.defer(function()
-	pcall(OpenSynSaveInstanceGUI)
-end)
 
 return synsaveinstance
